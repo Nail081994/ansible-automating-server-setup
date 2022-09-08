@@ -1,0 +1,4 @@
+---
+
+create_user: user
+system_packages: [ 'curl', 'vim', 'git', 'ufw' ]

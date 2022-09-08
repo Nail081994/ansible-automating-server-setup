@@ -1,0 +1,65 @@
+##################################
+# Playbooks: Initial server setup
+##################################
+---
+- hosts: all
+  become: yes
+  vars_files:
+          - vars/default.yml
+
+  tasks:
+
+    - name: Updating and upgrading apt
+      shell: |
+              apt update && apt upgrade -y
+
+    - name: Install aptitude
+      apt:
+        name: aptitude
+        state: latest
+        update_cache: true
+
+    - name: Create a new regular user with sudo privileges
+      user:
+        name: "{{ create_user }}"
+        state: present
+        groups: sudo
+        append: true
+        create_home: true
+        shell: /bin/bash
+
+    - name: allow 'create_user' to use sudo without needing a password
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^sudo'
+        line: '%sudo ALL=(ALL) NOPASSWD: ALL'
+        validate: '/usr/sbin/visudo -cf %s'
+
+    - name: Set authorized key for remote user
+      ansible.posix.authorized_key:
+        user: "{{ create_user }}"
+        state: present
+        key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
+    - name: Disable password authentication for machine
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        state: present
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+
+    - name: Update apt and install required system packages
+      apt: 
+       name: "{{  system_packages  }}"
+       state: latest
+
+    - name: UFW - Allow SSH connections
+      community.general.ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: UFW - Enable and deny by default
+      community.general.ufw:
+        state: enabled
+        default: deny
